@@ -1,0 +1,216 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{C4C4D221-9F7E-4C58-AE5F-E20EBE881AA9}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ManageLMS</RootNamespace>
+    <AssemblyName>ManageLMS</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=4.5.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\DUE_API\packages\Newtonsoft.Json.4.5.11\lib\net40\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BLL\BaseManager.cs" />
+    <Compile Include="BLL\Cache\MoodleCache.cs" />
+    <Compile Include="BLL\Manager\CategoryManager\CategoryManager.cs" />
+    <Compile Include="BLL\Manager\CourseManager\CourseManager.cs" />
+    <Compile Include="BLL\Manager\EnrollManager\EnrollManager.cs" />
+    <Compile Include="BLL\Manager\OtherManager\OtherManager.cs" />
+    <Compile Include="BLL\Manager\UserManager\StudentManager.cs" />
+    <Compile Include="BLL\Manager\UserManager\TeacherManager.cs" />
+    <Compile Include="BLL\Manager\UserManager\UserManager.cs" />
+    <Compile Include="BLL\SyncEngine\CourseSyncEngine.cs" />
+    <Compile Include="BLL\SyncEngine\MasterSyncEngine.cs" />
+    <Compile Include="BLL\SyncEngine\SemesterSyncEngine.cs" />
+    <Compile Include="BLL\SyncEngine\StudentSyncEngine.cs" />
+    <Compile Include="BLL\SyncEngine\TeacherSyncEngine.cs" />
+    <Compile Include="Common\DTO\Database\DatabaseDTO.cs" />
+    <Compile Include="Common\DTO\Moodle\Moodle_Models.cs" />
+    <Compile Include="Common\DTO\ViewModel\ViewModel.cs" />
+    <Compile Include="Common\Helpers\AppConstant.cs" />
+    <Compile Include="Common\Helpers\ConfigHelper.cs" />
+    <Compile Include="DAL\Database\DataDaoTao.cs" />
+    <Compile Include="DAL\Function.cs" />
+    <Compile Include="DAL\MoodleAPI\ApiClient.cs" />
+    <Compile Include="DAL\MoodleAPI\BaseRepo.cs" />
+    <Compile Include="DAL\MoodleAPI\Repositories\CategoryRepo.cs" />
+    <Compile Include="DAL\MoodleAPI\Repositories\CourseRepo.cs" />
+    <Compile Include="DAL\MoodleAPI\Repositories\EnrollmentRepo.cs" />
+    <Compile Include="DAL\MoodleAPI\Repositories\MoodleRepo.cs" />
+    <Compile Include="DAL\MoodleAPI\Repositories\UserRepo.cs" />
+    <Compile Include="UI\Course\UserCourse\ListUserCourse.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\Course\UserCourse\ListUserCourse.Designer.cs">
+      <DependentUpon>ListUserCourse.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Course\UserCourse\UserCourseView.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\Course\UserCourse\UserCourseView.Designer.cs">
+      <DependentUpon>UserCourseView.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\MainForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\MainForm.Designer.cs">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UI\Sync\MasterInitUC.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Sync\MasterInitUC.Designer.cs">
+      <DependentUpon>MasterInitUC.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Sync\MasterStudentSyncUC.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Sync\MasterStudentSyncUC.Designer.cs">
+      <DependentUpon>MasterStudentSyncUC.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Sync\SemesterSyncUC.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Sync\SemesterSyncUC.Designer.cs">
+      <DependentUpon>SemesterSyncUC.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\Sync\SyncControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\Sync\SyncControl.Designer.cs">
+      <DependentUpon>SyncControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\UserManage\StudentUC.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\UserManage\StudentUC.Designer.cs">
+      <DependentUpon>StudentUC.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\UserManage\TeacherUC.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="UI\UserManage\TeacherUC.Designer.cs">
+      <DependentUpon>TeacherUC.cs</DependentUpon>
+    </Compile>
+    <Compile Include="UI\UserManage\UserEditForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\UserManage\UserEditForm.Designer.cs">
+      <DependentUpon>UserEditForm.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="UI\Course\UserCourse\ListUserCourse.resx">
+      <DependentUpon>ListUserCourse.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Course\UserCourse\UserCourseView.resx">
+      <DependentUpon>UserCourseView.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\MainForm.resx">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="UI\Sync\MasterInitUC.resx">
+      <DependentUpon>MasterInitUC.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Sync\MasterStudentSyncUC.resx">
+      <DependentUpon>MasterStudentSyncUC.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Sync\SemesterSyncUC.resx">
+      <DependentUpon>SemesterSyncUC.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\Sync\SyncControl.resx">
+      <DependentUpon>SyncControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\UserManage\StudentUC.resx">
+      <DependentUpon>StudentUC.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\UserManage\TeacherUC.resx">
+      <DependentUpon>TeacherUC.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\UserManage\UserEditForm.resx">
+      <DependentUpon>UserEditForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <None Include="bin\Debug\ManageLMS.exe.config" />
+    <None Include="bin\Debug\ManageLMS.vshost.exe.config" />
+    <None Include="bin\Debug\ManageLMS.vshost.exe.manifest" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <None Include="UI\App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="bin\Debug\ManageLMS.exe" />
+    <Content Include="bin\Debug\ManageLMS.pdb" />
+    <Content Include="bin\Debug\ManageLMS.vshost.exe" />
+    <Content Include="bin\Debug\Newtonsoft.Json.dll" />
+    <Content Include="bin\Debug\Newtonsoft.Json.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="bin\Release\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

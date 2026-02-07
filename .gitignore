@@ -1,0 +1,5 @@
+﻿App.config
+bin/
+obj/
+.vs/
+*.user
