@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
-using System.Threading.Tasks; // Cần thêm cái này để chạy Task Sync
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ManageLMS.UI.Sync
@@ -18,16 +18,44 @@ namespace ManageLMS.UI.Sync
         private SemesterSyncEngine _engine;
         private BackgroundWorker _bgwLoad;
         private DataGridView _currentClickedDgv = null;
+
         // Pagination State
         private int _currentPage = 1;
-        private int _pageSize = 100; // Mặc định 100 lớp/trang
+        private int _pageSize = 100;
         private int _totalLoaded = 0;
 
         // Search Params
         private int _currentKyHoc;
         private string _currentMaKyHoc;
         private string _currentKeyword;
+        private string _currentHeDaoTao; // Lưu mã hệ đang lọc
         private SemesterSyncEngine.SyncStatusFilter _currentFilter;
+
+        // Định nghĩa mã hệ
+        private const string HE_CHINH_QUY = "CQ";
+        private const string HE_VHVL = "VHVL";
+
+        // Class phụ để bind ComboBox
+        public class ComboBoxItem
+        {
+            public string Text { get; set; }
+            public object Value { get; set; }
+            public override string ToString() { return Text; }
+            public ComboBoxItem(string text, object value) { Text = text; Value = value; }
+        }
+
+        // Struct tham số cho BackgroundWorker
+        private struct LoadArgs
+        {
+            public bool IsReload;
+            public int KyHoc;
+            public string MaKyHoc;
+            public string Keyword;
+            public string HeDaoTao;
+            public int Page;
+            public int Size;
+            public SemesterSyncEngine.SyncStatusFilter FilterMode;
+        }
 
         public SemesterSyncUC()
         {
@@ -43,7 +71,7 @@ namespace ManageLMS.UI.Sync
             // 1. Setup GridView
             SetupGrid();
 
-            // 2. Setup BackgroundWorker (Load Data)
+            // 2. Setup BackgroundWorker
             _bgwLoad = new BackgroundWorker();
             _bgwLoad.WorkerReportsProgress = true;
             _bgwLoad.DoWork += _bgwLoad_DoWork;
@@ -51,17 +79,22 @@ namespace ManageLMS.UI.Sync
             _bgwLoad.RunWorkerCompleted += _bgwLoad_RunWorkerCompleted;
 
             // 3. Events
+            this.Load += SemesterSyncUC_Load;
             btnSemFilter.Click += btnSemFilter_Click;
             btnNextPage.Click += btnNextPage_Click;
             btnPrevPage.Click += btnPrevPage_Click;
 
-            // [MỚI] Sự kiện nút Đồng bộ
-            btnSyncSemStudents.Click += btnSyncSemStudents_Click;
+            btnSyncSemStudents.Click += btnSyncSemStudents_Click; // Đồng bộ chọn
 
-            // Xử lý sự kiện vẽ row để tô màu
+
+            // Context Menu Events
+            dgvSemesterPreview.CellMouseDown += dgv_CellMouseDown;
+            mnu_ViewEnrolledUser.Click += mnu_ViewEnrolledUser_Click;
+
+            // Xử lý vẽ row
             dgvSemesterPreview.CellFormatting += DgvSemesterPreview_CellFormatting;
 
-            // 4. Setup ComboBox Filter
+            // 4. Setup ComboBox Status Filter
             cboStatusFilter.Items.Clear();
             cboStatusFilter.Items.Add(new ComboBoxItem("Tất cả", (int)SemesterSyncEngine.SyncStatusFilter.All));
             cboStatusFilter.Items.Add(new ComboBoxItem("Chưa tạo trên Moodle", (int)SemesterSyncEngine.SyncStatusFilter.NotCreated));
@@ -75,8 +108,22 @@ namespace ManageLMS.UI.Sync
 
             // Init Engine
             _engine = new SemesterSyncEngine();
-            // Đăng ký log (nếu bạn có TextBox Log trên UI thì gán vào đây)
-            // _engine.OnLogMessage += (msg) => { Invoke((Action)(() => txtLog.AppendText(msg + Environment.NewLine))); };
+        }
+
+        private void SemesterSyncUC_Load(object sender, EventArgs e)
+        {
+            // Setup ComboBox Hệ Đào Tạo
+            cbbHDT.Items.Clear();
+            cbbHDT.Items.Add(new ComboBoxItem("Hệ Chính Quy", HE_CHINH_QUY));
+            cbbHDT.Items.Add(new ComboBoxItem("Hệ Vừa Học Vừa Làm", HE_VHVL));
+            cbbHDT.SelectedIndex = 0;
+            cbbHDT.DisplayMember = "Text";
+            cbbHDT.ValueMember = "Value";
+
+
+
+            // Set text mặc định cho btnSyncAll
+            btnSyncAll.Text = "Đồng bộ toàn bộ";
         }
 
         private void SetupGrid()
@@ -88,11 +135,11 @@ namespace ManageLMS.UI.Sync
             dgvSemesterPreview.Columns.Clear();
 
             AddCol("MaLopTinChi", "Mã Lớp", 100);
-            AddCol("MonHoc", "Tên Môn Học", 200, true); // Fill
+            AddCol("MonHoc", "Tên Môn Học", 200, true);
             AddCol("SiSoSQL", "Sĩ số SQL", 80);
             AddCol("SiSoMoodle", "Sĩ số Moodle", 80);
-            AddCol("SoLuongThieu", "Thiếu (Cần Enroll)", 120);
-            AddCol("SoLuongThua", "Thừa (Cần Unenroll)", 120);
+            AddCol("SoLuongThieu", "Thiếu (Enroll)", 100);
+            AddCol("SoLuongThua", "Thừa (Unenroll)", 100);
             AddCol("TrangThai", "Trạng Thái", 150);
             AddCol("MoodleShortname", "Moodle Shortname", 150);
         }
@@ -126,20 +173,20 @@ namespace ManageLMS.UI.Sync
             }
 
             string yearStr = txtSemYear.Text.Trim();
-            // Logic lấy 3 số cuối làm mã kỳ (VD: 20241 -> 241)
             _currentMaKyHoc = yearStr.Length > 3 ? yearStr.Substring(yearStr.Length - 3) : yearStr;
             _currentKeyword = cboSemClass.Text.Trim();
 
-            var selectedItem = cboStatusFilter.SelectedItem as ComboBoxItem;
-            _currentFilter = selectedItem != null
-                ? (SemesterSyncEngine.SyncStatusFilter)selectedItem.Value
+            // Lấy Hệ đào tạo đang chọn
+            var selectedHe = cbbHDT.SelectedItem as ComboBoxItem;
+            _currentHeDaoTao = selectedHe != null ? selectedHe.Value.ToString() : HE_CHINH_QUY;
+
+            var selectedStatus = cboStatusFilter.SelectedItem as ComboBoxItem;
+            _currentFilter = selectedStatus != null
+                ? (SemesterSyncEngine.SyncStatusFilter)selectedStatus.Value
                 : SemesterSyncEngine.SyncStatusFilter.All;
 
-            // Reset về trang 1
             _currentPage = 1;
-
-            // [QUAN TRỌNG] True = Load lại từ SQL
-            LoadData(true);
+            LoadData(true); // True = Load lại từ SQL
         }
 
         private void btnPrevPage_Click(object sender, EventArgs e)
@@ -147,8 +194,7 @@ namespace ManageLMS.UI.Sync
             if (_currentPage > 1)
             {
                 _currentPage--;
-                // [QUAN TRỌNG] False = Chỉ lấy trang khác từ RAM
-                LoadData(false);
+                LoadData(false); // False = Lấy từ RAM
             }
         }
 
@@ -157,7 +203,6 @@ namespace ManageLMS.UI.Sync
             if (_totalLoaded >= _pageSize)
             {
                 _currentPage++;
-                // [QUAN TRỌNG] False = Chỉ lấy trang khác từ RAM
                 LoadData(false);
             }
         }
@@ -172,7 +217,6 @@ namespace ManageLMS.UI.Sync
 
             SetUIState(false);
             dgvSemesterPreview.DataSource = null;
-
             lblPageNumber.Text = isReload ? "Đang tải dữ liệu từ SQL..." : string.Format("Đang tải trang {0}...", _currentPage);
 
             var args = new LoadArgs
@@ -181,6 +225,7 @@ namespace ManageLMS.UI.Sync
                 KyHoc = _currentKyHoc,
                 MaKyHoc = _currentMaKyHoc,
                 Keyword = _currentKeyword,
+                HeDaoTao = _currentHeDaoTao, // Truyền hệ vào worker
                 Page = _currentPage,
                 Size = _pageSize,
                 FilterMode = _currentFilter
@@ -193,20 +238,18 @@ namespace ManageLMS.UI.Sync
         {
             var args = (LoadArgs)e.Argument;
 
-            // Bước 1: Nếu là Reload -> Gọi hàm Load SQL (Nặng)
+            // Bước 1: Load SQL (có lọc theo Hệ)
             if (args.IsReload)
             {
-                _engine.LoadAndGroupSqlData(args.KyHoc, args.MaKyHoc, args.Keyword);
+                // Gọi hàm Load SQL mới (có tham số HeDaoTao)
+                _engine.LoadAndGroupSqlData(args.KyHoc, args.MaKyHoc, args.Keyword, args.HeDaoTao);
             }
 
-            // Bước 2: Luôn gọi hàm GetPage (Lấy từ RAM + Check Moodle)
+            // Bước 2: Get Page
             e.Result = _engine.GetPageData(args.Page, args.Size, args.FilterMode);
         }
 
-        private void _bgwLoad_ProgressChanged(object sender, ProgressChangedEventArgs e)
-        {
-            // Có thể update progress bar
-        }
+        private void _bgwLoad_ProgressChanged(object sender, ProgressChangedEventArgs e) { }
 
         private void _bgwLoad_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
@@ -226,16 +269,16 @@ namespace ManageLMS.UI.Sync
             lblPageNumber.Text = string.Format("Trang {0} - Hiển thị {1} lớp", _currentPage, _totalLoaded);
 
             btnPrevPage.Enabled = _currentPage > 1;
-            // Nếu load đủ trang thì khả năng còn trang sau
             btnNextPage.Enabled = _totalLoaded == _pageSize;
         }
 
         // ==========================================
-        // 3. SYNC ACTION (NÚT ĐỒNG BỘ)
+        // 3. SYNC ACTION (ĐỒNG BỘ)
         // ==========================================
+
+        // Đồng bộ các lớp được chọn (Manual Sync)
         private void btnSyncSemStudents_Click(object sender, EventArgs e)
         {
-            // Lấy danh sách các dòng được chọn
             var selectedItems = new List<SemesterSyncViewModel>();
             foreach (DataGridViewRow row in dgvSemesterPreview.SelectedRows)
             {
@@ -245,26 +288,23 @@ namespace ManageLMS.UI.Sync
 
             if (selectedItems.Count == 0)
             {
-                MessageBox.Show("Vui lòng chọn ít nhất một lớp để đồng bộ (Giữ Ctrl hoặc Shift để chọn nhiều).");
+                MessageBox.Show("Vui lòng chọn ít nhất một lớp để đồng bộ.");
                 return;
             }
 
             if (MessageBox.Show(string.Format("Bạn có chắc chắn muốn đồng bộ {0} lớp đã chọn?", selectedItems.Count),
-                "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-            {
-                return;
-            }
+                "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
-            // Khóa UI
             SetUIState(false);
             lblPageNumber.Text = "Đang thực hiện đồng bộ...";
 
-            // Chạy Task riêng để không đơ UI (SyncList chạy khá lâu)
             Task.Factory.StartNew(() =>
             {
                 try
                 {
-                    // Gọi hàm SyncList mới (chỉ cần truyền MaKyHoc)
+                    // Gọi hàm SyncList (Manual Sync)
+                    // Lưu ý: SyncList sẽ dùng hệ mặc định (hoặc logic trong Engine)
+                    // Nếu muốn sync đúng hệ, bạn cần sửa SyncList trong Engine để nhận MaHe, nhưng hiện tại Engine mặc định CQ cho manual
                     _engine.SyncList(selectedItems, _currentMaKyHoc);
                 }
                 catch (Exception ex)
@@ -273,26 +313,138 @@ namespace ManageLMS.UI.Sync
                 }
             }).ContinueWith(t =>
             {
-                // Khi xong thì reload lại trang hiện tại để cập nhật trạng thái xanh/đỏ
-                // Chạy trên UI Thread
                 this.Invoke((Action)(() =>
                 {
                     MessageBox.Show("Đồng bộ hoàn tất!");
-                    LoadData(false); // Load lại trang hiện tại (không cần load lại SQL)
+                    LoadData(false);
                 }));
             });
         }
 
+        // Đồng bộ toàn bộ (Sync All) - Theo Hệ đã chọn
+        private void btnSyncAll_Click(object sender, EventArgs e)
+        {
+            string namHoc = txtSemYear.Text.Trim();
+
+            // Xác định hệ đang chọn để hiển thị thông báo đúng
+            string heText = (_currentHeDaoTao == HE_CHINH_QUY) ? "CHÍNH QUY" : "VỪA HỌC VỪA LÀM";
+
+            if (MessageBox.Show(string.Format("Bạn có chắc chắn muốn đồng bộ TOÀN BỘ dữ liệu hệ {0} - Học kỳ {1}?\nQuá trình này có thể mất nhiều thời gian.", heText, namHoc),
+                "Xác nhận Sync All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                return;
+            }
+
+            SetUIState(false);
+            rtbLog.Clear();
+
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    // Gọi hàm Sync tương ứng với hệ
+                    if (_currentHeDaoTao == HE_CHINH_QUY)
+                    {
+                        _engine.SyncAllDatabase_CQ(namHoc);
+                    }
+                    else if (_currentHeDaoTao == HE_VHVL)
+                    {
+                        _engine.SyncAllDatabase_VHVL(namHoc);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendLog("Lỗi Fatal: " + ex.Message);
+                }
+            }).ContinueWith(t =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    MessageBox.Show("Đã hoàn tất đồng bộ toàn bộ!");
+                    SetUIState(true);
+                    LoadData(false);
+                }));
+            });
+        }
+
+
+
+        private void dgv_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                var dgv = sender as DataGridView;
+                _currentClickedDgv = dgv;
+
+                if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+                {
+                    dgv.CurrentCell = dgv.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                    dgv.Rows[e.RowIndex].Selected = true;
+                }
+            }
+        }
+
+        private Tuple<long, string> GetSelectedCourseInfo(DataGridView dgv)
+        {
+            if (dgv != null && dgv.CurrentRow != null && dgv.CurrentRow.DataBoundItem != null)
+            {
+                var rawItem = dgv.CurrentRow.DataBoundItem;
+
+                if (rawItem is MoodleCourse)
+                {
+                    var item = rawItem as MoodleCourse;
+                    return Tuple.Create(item.id, item.fullname);
+                }
+                else if (rawItem is UserCourseViewModel)
+                {
+                    var item = rawItem as UserCourseViewModel;
+                    return Tuple.Create(item.CourseId, item.Fullname);
+                }
+                else if (rawItem is MasterSyncViewModel)
+                {
+                    var item = rawItem as MasterSyncViewModel;
+                    return Tuple.Create(item.MoodleCourseId, item.TenHocPhan);
+                }
+                else if (rawItem is SemesterSyncViewModel)
+                {
+                    var item = rawItem as SemesterSyncViewModel;
+                    return Tuple.Create(item.MoodleCourseId, item.MonHoc);
+                }
+            }
+            return Tuple.Create(0L, (string)null);
+        }
+
+        private void mnu_ViewEnrolledUser_Click(object sender, EventArgs e)
+        {
+            if (_currentClickedDgv == null)
+            {
+                MessageBox.Show("Vui lòng chọn lại khóa học.");
+                return;
+            }
+
+            var courseInfo = GetSelectedCourseInfo(_currentClickedDgv);
+            long courseId = courseInfo.Item1;
+            string courseName = courseInfo.Item2;
+
+            if (courseId > 0)
+            {
+                var frm = new ListUserCourse(courseId, courseName);
+                frm.ShowDialog();
+            }
+            else
+            {
+                MessageBox.Show("Khóa học này chưa được tạo trên Moodle hoặc ID không hợp lệ.");
+            }
+        }
+
         // ==========================================
-        // Helpers & Styling
+        // 5. HELPERS & STYLING
         // ==========================================
 
         private void SetUIState(bool enabled)
         {
-            btnSemFilter.Enabled = enabled;
-            btnNextPage.Enabled = enabled;
-            btnPrevPage.Enabled = enabled;
-            cboStatusFilter.Enabled = enabled;
+            grpSemesterFilter.Enabled = enabled;
+            pnlSemesterActions.Enabled = enabled;
             btnSyncSemStudents.Enabled = enabled;
             dgvSemesterPreview.Enabled = enabled;
         }
@@ -319,6 +471,7 @@ namespace ManageLMS.UI.Sync
                 }
             }
         }
+
         private void AppendLog(string msg)
         {
             if (rtbLog.InvokeRequired)
@@ -332,7 +485,6 @@ namespace ManageLMS.UI.Sync
             }
         }
 
-        // Hàm update progress
         private void UpdateProgress(int current, int total)
         {
             if (pbSyncProgress.InvokeRequired)
@@ -345,131 +497,5 @@ namespace ManageLMS.UI.Sync
                 pbSyncProgress.Value = current > total ? total : current;
             }
         }
-        private void btnSyncAll_Click(object sender, EventArgs e)
-        {
-            if (MessageBox.Show("Bạn có chắc chắn muốn đồng bộ TOÀN BỘ dữ liệu?\nQuá trình này có thể mất nhiều thời gian.",
-        "Xác nhận Sync All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-            {
-                return;
-            }
-
-            // Khóa UI
-            SetUIState(false);
-            rtbLog.Clear();
-
-            // Chạy Task
-            Task.Factory.StartNew(() =>
-            {
-                try
-                {
-                    // Kiểm tra xem đã load dữ liệu chưa, nếu chưa thì load
-                    // (Nhưng thường người dùng đã bấm Lọc rồi mới bấm Sync All)
-
-                    // Gọi hàm SyncAll
-                    _engine.SyncAllDatabase(_currentMaKyHoc);
-                }
-                catch (Exception ex)
-                {
-                    AppendLog("Lỗi Fatal: " + ex.Message);
-                }
-            }).ContinueWith(t =>
-            {
-                this.Invoke((Action)(() =>
-                {
-                    MessageBox.Show("Đã hoàn tất đồng bộ toàn bộ!");
-                    SetUIState(true);
-
-                    // Reload lại Grid trang hiện tại để thấy kết quả
-                    LoadData(false);
-                }));
-            });
-        }
-
-        private void dgv_CellMouseDown(object sender, DataGridViewCellMouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Right)
-            {
-                var dgv = sender as DataGridView;
-                _currentClickedDgv = dgv;
-                if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
-                {
-                    dgv.CurrentCell = dgv.Rows[e.RowIndex].Cells[e.ColumnIndex];
-                    
-                    dgv.Rows[e.RowIndex].Selected = true;
-                }
-            }
-        }
-        private Tuple<long, string> GetSelectedCourseInfo(DataGridView dgv)
-        {
-            if (dgv != null && dgv.CurrentRow != null && dgv.CurrentRow.DataBoundItem != null)
-            {
-                var rawItem = dgv.CurrentRow.DataBoundItem;
-
-                
-                if (rawItem is MoodleCourse)
-                {
-                    var item = rawItem as MoodleCourse;
-                    return Tuple.Create(item.id, item.fullname);
-                }
-                
-                else if (rawItem is UserCourseViewModel)
-                {
-                    var item = rawItem as UserCourseViewModel;
-                    return Tuple.Create(item.CourseId, item.Fullname);
-                }
-                
-                else if (rawItem is MasterSyncViewModel)
-                {
-                    var item = rawItem as MasterSyncViewModel;
-                    
-                    return Tuple.Create(item.MoodleCourseId, item.TenHocPhan);
-                }
-                
-                else if (rawItem is SemesterSyncViewModel)
-                {
-                    var item = rawItem as SemesterSyncViewModel;
-                    return Tuple.Create(item.MoodleCourseId, item.MonHoc);
-                }
-            }
-            return Tuple.Create(0L, (string)null);
-        }
-        private void mnu_ViewEnrolledUser_Click(object sender, EventArgs e)
-        {
-
-            DataGridView targetGrid = null;
-
-            var sourceControl = menuStripUserCourse.SourceControl as DataGridView;
-
-            if (sourceControl == null)
-            {
-                // Fallback: Kiểm tra focus
-                if (dgvSemesterPreview.Focused) targetGrid = dgvSemesterPreview;
-                else if (dgvSemesterPreview.Focused) targetGrid = dgvSemesterPreview;
-            }
-            else
-            {
-                targetGrid = sourceControl;
-            }
-
-            if (targetGrid == null) return;
-
-            // Gọi hàm chung để lấy ID
-            var courseInfo = GetSelectedCourseInfo(targetGrid);
-            long courseId = courseInfo.Item1;
-            string courseName = courseInfo.Item2;
-
-            if (courseId > 0)
-            {
-                // Mở form xem danh sách thành viên (Form bạn vừa tạo ở câu trước)
-                var frm = new ListUserCourse(courseId, courseName);
-                frm.ShowDialog();
-            }
-            else
-            {
-                MessageBox.Show("Vui lòng chọn một khóa học.");
-            }
-        }
-
-
     }
 }

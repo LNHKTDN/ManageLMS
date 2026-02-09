@@ -145,17 +145,23 @@ namespace ManageLMS.Common.DTO.ViewModel
             ListMaGiaoVien = new List<string>();
         }
 
-        public string GetExpectedIdNumber()
+        public string GetExpectedIdNumber(string overrideMaHe = "", string overrideMaKhoa = "")
         {
-            // Xử lý null safe cho MaKhoa
-            string safeMaKhoa = string.IsNullOrEmpty(MaKhoa) ? "UNK" : MaKhoa;
-            return string.Format("MASTER_{0}_{1}_{2}", MaHe, safeMaKhoa, MaHocPhan);
+            // Ưu tiên tham số truyền vào -> sau đó đến property -> cuối cùng là UNK
+            string useMaHe = !string.IsNullOrEmpty(overrideMaHe) ? overrideMaHe : (MaHe ?? "UNK");
+            string useMaKhoa = !string.IsNullOrEmpty(overrideMaKhoa) ? overrideMaKhoa : (MaKhoa ?? "UNK");
+
+            // Format: MASTER_[HE]_[KHOA]_[MAHP]
+            return string.Format("MASTER_{0}_{1}_{2}", useMaHe, useMaKhoa, MaHocPhan);
         }
 
-        // [SỬA] Format Tên: [TenHe] [MaHocPhan] TenHocPhan
-        public string GetExpectedFullName()
+        
+        public string GetExpectedFullName(string overrideTenHe = "")
         {
-            return string.Format("[{0}] [{1}] {2}", TenHe, MaHocPhan, TenHocPhan);
+            string useTenHe = !string.IsNullOrEmpty(overrideTenHe) ? overrideTenHe : (TenHe ?? "CHUNG");
+
+            // Format: [Tên Hệ] [Mã HP] Tên HP
+            return string.Format("[{0}] [{1}] {2}", useTenHe, MaHocPhan, TenHocPhan);
         }
     }
     public class ComboBoxItem

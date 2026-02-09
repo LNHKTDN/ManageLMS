@@ -61,6 +61,7 @@ namespace ManageLMS.DTO.Model
         public int visible { get; set; }           // Trạng thái hiển thị (1: Hiện, 0: Ẩn)
         public string format { get; set; }
 
+
     }
     public class MoodleCohort
     {

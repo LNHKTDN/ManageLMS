@@ -31,11 +31,23 @@ namespace ManageLMS.BLL.SyncEngine
         private string _cachedMaKyHoc;
         private ConcurrentDictionary<string, long> _categoryCache;
 
-        private const string MASTER_CATEGORY_IDNUMBER = "MASTER_ROOT";
-        private const string MASTER_CATEGORY_NAME = "KHÓA HỌC CHUNG (MASTER COURSES)";
+        // Lưu TrainingType hiện tại để dùng cho ProcessGroups
+        private TrainingType _currentTrainingType;
+
+        private const string MASTER_ROOT_ID = AppConstant.MoodleString.masterIdNumber;
+        private const string MASTER_ROOT_NAME = AppConstant.MoodleString.masterCategoryName;
 
         public event Action<string> OnLogMessage;
         public event Action<int, int> OnProgress;
+
+        public enum TrainingType
+        {
+            DaiHoc_ChinhQuy,
+            DaiHoc_VHVL,
+            SauDaiHoc
+        }
+
+        public enum SyncStatusFilter { All = 0, NotCreated = 1, Created = 2, Diff = 3, Synced = 4 }
 
         public MasterSyncEngine()
         {
@@ -51,26 +63,29 @@ namespace ManageLMS.BLL.SyncEngine
             _categoryCache = new ConcurrentDictionary<string, long>();
         }
 
-        public enum SyncStatusFilter { All = 0, NotCreated = 1, Created = 2, Diff = 3, Synced = 4 }
 
-        // =================================================================
-        // 1. LOAD & GROUP
-        // =================================================================
-        public int LoadAndGroupMasterData(int kyHoc, string maKyHoc, string keyword, string filterMaHe = "", string filterMaKhoa = "")
+        public int LoadAndGroupMasterData(int kyHoc, string maKyHoc, string keyword, TrainingType trainingType, string filterMaKhoa = "")
         {
             Log("Đang tải dữ liệu Lớp Học Phần (Master) từ SQL...");
             _cachedMaKyHoc = maKyHoc;
+            _currentTrainingType = trainingType; // Lưu lại để dùng sau
+            _categoryCache.Clear();
 
             var allData = new List<TTDsSVTheoLopHP>();
             int fetchPage = 1;
             int fetchSize = 20000;
 
+            // Lấy mã hệ từ TrainingType để truyền vào SQL (nếu cần lọc bước 1)
+            string filterMaHe = "";
+            string dummyName;
+            GetHeInfoFromType(trainingType, out filterMaHe, out dummyName);
+
             while (true)
             {
-                var chunk = _sqlDal.GetDsSinhVienTheoLopHocPhan(kyHoc, keyword, filterMaHe, filterMaKhoa, fetchPage, fetchSize);
+                
+                var chunk = _sqlDal.GetDsSinhVienTheoLopHocPhan(kyHoc, keyword, filterMaKhoa, fetchPage, fetchSize);
                 if (chunk == null || chunk.Count == 0) break;
 
-                // [FIX]: Chuẩn hóa Mã Học Phần (Cắt bỏ đuôi _1, _2...)
                 foreach (var item in chunk)
                 {
                     if (!string.IsNullOrEmpty(item.MaHocPhan) && item.MaHocPhan.Contains("_"))
@@ -86,8 +101,9 @@ namespace ManageLMS.BLL.SyncEngine
 
             Log(string.Format("Đã tải {0} dòng. Đang gom nhóm...", allData.Count));
 
+
             _cachedMasterGroups = allData
-                .GroupBy(x => string.Format("{0}_{1}_{2}", x.MaHe, x.MaKhoa, x.MaHocPhan))
+                .GroupBy(x => string.Format("{0}_{1}", x.MaKhoa, x.MaHocPhan))
                 .OrderBy(g => g.Key)
                 .ToList();
 
@@ -96,11 +112,15 @@ namespace ManageLMS.BLL.SyncEngine
         }
 
         // =================================================================
-        // 2. PROCESS LOGIC (TÁCH BIỆT ĐỂ TÁI SỬ DỤNG)
+        // 2. PROCESS LOGIC
         // =================================================================
         private List<MasterSyncViewModel> ProcessGroups(List<IGrouping<string, TTDsSVTheoLopHP>> groups)
         {
             var resultList = new ConcurrentBag<MasterSyncViewModel>();
+
+            // Lấy thông tin Hệ chuẩn từ TrainingType đã lưu
+            string stdMaHe, stdTenHe;
+            GetHeInfoFromType(_currentTrainingType, out stdMaHe, out stdTenHe);
 
             // A. Pre-load Cache (Batch)
             var allMSSV = groups.SelectMany(g => g.Select(x => x.MaSinhVien.Trim())).Distinct().ToList();
@@ -115,11 +135,12 @@ namespace ManageLMS.BLL.SyncEngine
             var missingGV = MoodleCache.GetMissingKeys(allGV);
             if (missingGV.Count > 0) _teacherMgr.LoadSpecificUsersToCache(missingGV);
 
-            // B. Map ID
+            // B. Map ID (Sử dụng stdMaHe chuẩn thay vì lấy từ DB)
             var idNumbersToCheck = groups.Select(g =>
             {
                 var f = g.First();
-                return string.Format("MASTER_{0}_{1}_{2}", f.MaHe, f.MaKhoa, f.MaHocPhan);
+                // Format IDNumber: MASTER_[STD_MAHE]_[MAKHOA]_[MAHP]
+                return string.Format("MASTER_{0}_{1}_{2}", stdMaHe, f.MaKhoa, f.MaHocPhan);
             }).ToList();
 
             var moodleCourses = _courseMgr.GetCoursesByField("idnumber", idNumbersToCheck);
@@ -129,15 +150,16 @@ namespace ManageLMS.BLL.SyncEngine
             Parallel.ForEach(groups, new ParallelOptions { MaxDegreeOfParallelism = 10 }, group =>
             {
                 var firstRow = group.First();
-                string idNumber = string.Format("MASTER_{0}_{1}_{2}", firstRow.MaHe, firstRow.MaKhoa, firstRow.MaHocPhan);
+                // Sử dụng stdMaHe chuẩn
+                string idNumber = string.Format("MASTER_{0}_{1}_{2}", stdMaHe, firstRow.MaKhoa, firstRow.MaHocPhan);
 
                 var vm = new MasterSyncViewModel
                 {
                     MaHocPhan = firstRow.MaHocPhan,
                     TenHocPhan = firstRow.TenHocPhan,
                     MaKyHoc = _cachedMaKyHoc,
-                    MaHe = firstRow.MaHe,
-                    TenHe = firstRow.TenHe,
+                    MaHe = stdMaHe,   // Gán mã hệ chuẩn
+                    TenHe = stdTenHe, // Gán tên hệ chuẩn
                     MaKhoa = firstRow.MaKhoa,
                     TenKhoa = firstRow.TenKhoa,
                     SiSoSQL = group.Select(x => x.MaSinhVien).Distinct().Count(),
@@ -161,7 +183,6 @@ namespace ManageLMS.BLL.SyncEngine
 
                     var moodleUsernames = new HashSet<string>(moodleStudents.Select(u => u.Username.Trim().ToLower()));
 
-                    // [FIX] Lọc ra LIST OBJECT thay vì String
                     vm.ListData_SV_Thieu = group.Where(x => !string.IsNullOrEmpty(x.MaSinhVien)
                                                          && !moodleUsernames.Contains(x.MaSinhVien.Trim().ToLower()))
                                                 .GroupBy(x => x.MaSinhVien).Select(g => g.First())
@@ -177,70 +198,30 @@ namespace ManageLMS.BLL.SyncEngine
                     vm.SiSoMoodle = 0;
                     vm.SoLuongThieu = vm.SiSoSQL;
                     vm.TrangThai = "Chưa tạo";
-
-                    // Chưa có -> Convert toàn bộ sang List Object
                     vm.ListData_SV_Thieu = group.GroupBy(x => x.MaSinhVien).Select(g => g.First()).ToList();
                 }
                 resultList.Add(vm);
             });
 
-            return resultList.OrderBy(x => x.MaHe).ThenBy(x => x.MaKhoa).ThenBy(x => x.MaHocPhan).ToList();
+            return resultList.OrderBy(x => x.MaKhoa).ThenBy(x => x.MaHocPhan).ToList();
         }
 
         // =================================================================
-        // 3. UI HELPERS
+        // 3. SYNC ACTIONS
         // =================================================================
-        public List<MasterSyncViewModel> GetPageData(int page, int pageSize, SyncStatusFilter statusFilter)
-        {
-            if (_cachedMasterGroups == null || _cachedMasterGroups.Count == 0) return new List<MasterSyncViewModel>();
-            var pageGroups = _cachedMasterGroups.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-            Log(string.Format("Đang xử lý trang {0}...", page));
-            return ProcessGroups(pageGroups);
-        }
 
-        public List<MasterSyncViewModel> GetAllMissingData()
-        {
-            if (_cachedMasterGroups == null || _cachedMasterGroups.Count == 0) return new List<MasterSyncViewModel>();
-            Log("Đang quét toàn bộ DB...");
-            return ProcessGroups(_cachedMasterGroups).Where(x => x.MoodleCourseId == 0 || x.SoLuongThieu > 0).ToList();
-        }
-
-        // =================================================================
-        // 4. SYNC ACTIONS
-        // =================================================================
-        public void SyncList(List<MasterSyncViewModel> itemsToSync, string maKyHoc)
-        {
-            _categoryCache.Clear();
-            long rootId = EnsureRootCategory();
-            if (rootId == 0) return;
-
-            int total = itemsToSync.Count;
-            int count = 0;
-
-            foreach (var item in itemsToSync)
-            {
-                count++;
-                Log(string.Format("[{0}/{1}] Xử lý: {2} - {3}...", count, total, item.MaHe, item.MaHocPhan));
-                try
-                {
-                    long finalCatId = EnsureCategoryTree(rootId, item);
-                    if (item.MoodleCourseId == 0) CreateAndEnrollNewCourse(item, finalCatId);
-                    else FixDiffMasterCourse(item);
-                    ReportProgress(count, total);
-                }
-                catch (Exception ex) { Log(string.Format("Lỗi {0}: {1}", item.MaHocPhan, ex.Message)); }
-            }
-            Log("--- Hoàn tất ---");
-        }
-
-        public void SyncAllDatabase(string maKyHoc)
+        public void SyncAllDatabase(string maKyHoc, TrainingType type)
         {
             if (_cachedMasterGroups == null || _cachedMasterGroups.Count == 0) { Log("Vui lòng tải dữ liệu trước."); return; }
 
-            Log("=== BẮT ĐẦU SYNC ALL (MASTER) ===");
-            _categoryCache.Clear();
-            long rootId = EnsureRootCategory();
-            if (rootId == 0) { Log("Lỗi Fatal: Không thể tạo Root Category."); return; }
+            Log(string.Format("=== BẮT ĐẦU ĐỒNG BỘ MASTER ({0}) ===", type.ToString()));
+
+            long targetParentId = EnsureTrainingTypeCategoryTree(type);
+            if (targetParentId == 0) { Log("Lỗi: Không thể tạo cây thư mục."); return; }
+
+            // Lấy thông tin hệ chuẩn
+            string maHe, tenHe;
+            GetHeInfoFromType(type, out maHe, out tenHe);
 
             int total = _cachedMasterGroups.Count;
             int processed = 0;
@@ -251,6 +232,9 @@ namespace ManageLMS.BLL.SyncEngine
                 var batchGroups = _cachedMasterGroups.Skip(i).Take(batchSize).ToList();
                 Log(string.Format("--- Lô {0}-{1}/{2} ---", i + 1, i + batchGroups.Count, total));
 
+                // ProcessGroups sẽ tự động dùng _currentTrainingType (đã gán ở hàm Load)
+                // Nhưng để an toàn nếu gọi Sync trực tiếp, ta gán lại
+                _currentTrainingType = type;
                 var batchVMs = ProcessGroups(batchGroups);
 
                 foreach (var item in batchVMs)
@@ -258,9 +242,13 @@ namespace ManageLMS.BLL.SyncEngine
                     processed++;
                     try
                     {
-                        long finalCatId = EnsureCategoryTree(rootId, item);
-                        if (item.MoodleCourseId == 0) CreateAndEnrollNewCourse(item, finalCatId);
-                        else FixDiffMasterCourse(item);
+                        // Truyền maHe chuẩn vào để tạo category con
+                        long finalCatId = EnsureFacultyCategory(targetParentId, item, maHe);
+
+                        if (item.MoodleCourseId == 0)
+                            CreateAndEnrollNewCourse(item, finalCatId, type);
+                        else
+                            FixDiffMasterCourse(item);
                     }
                     catch (Exception ex) { Log(string.Format("Lỗi {0}: {1}", item.MaHocPhan, ex.Message)); }
                     ReportProgress(processed, total);
@@ -269,25 +257,74 @@ namespace ManageLMS.BLL.SyncEngine
             Log("=== HOÀN TẤT SYNC ALL ===");
         }
 
-        // =================================================================
-        // INTERNAL LOGIC
-        // =================================================================
-        private long EnsureRootCategory()
+        public void SyncList(List<MasterSyncViewModel> itemsToSync, string maKyHoc, TrainingType type)
         {
-            return GetOrCreateCategory(MASTER_CATEGORY_IDNUMBER, MASTER_CATEGORY_NAME, 0);
+            Log(string.Format("=== BẮT ĐẦU ĐỒNG BỘ CHỌN ({0}) ===", type.ToString()));
+
+            long rootId = EnsureTrainingTypeCategoryTree(type);
+            if (rootId == 0) { Log("Lỗi tạo danh mục."); return; }
+
+            string maHe, tenHe;
+            GetHeInfoFromType(type, out maHe, out tenHe);
+
+            int total = itemsToSync.Count;
+            int count = 0;
+
+            foreach (var item in itemsToSync)
+            {
+                count++;
+                Log(string.Format("[{0}/{1}] Xử lý: {2}...", count, total, item.MaHocPhan));
+                try
+                {
+                    long finalCatId = EnsureFacultyCategory(rootId, item, maHe);
+
+                    if (item.MoodleCourseId == 0)
+                        CreateAndEnrollNewCourse(item, finalCatId, type);
+                    else
+                        FixDiffMasterCourse(item);
+
+                    ReportProgress(count, total);
+                }
+                catch (Exception ex) { Log(string.Format("Lỗi {0}: {1}", item.MaHocPhan, ex.Message)); }
+            }
+            Log("--- Hoàn tất ---");
         }
 
-        private long EnsureCategoryTree(long rootId, MasterSyncViewModel item)
-        {
-            string heId = string.Format("MASTER_HE_{0}", item.MaHe);
-            string heName = string.IsNullOrEmpty(item.TenHe) ? item.MaHe : item.TenHe;
-            long heCatId = GetOrCreateCategory(heId, heName, rootId);
+        // =================================================================
+        // 4. CATEGORY MANAGEMENT
+        // =================================================================
 
-            string khoaId = string.Format("MASTER_{0}_KHOA_{1}", item.MaHe, item.MaKhoa);
+        private long EnsureTrainingTypeCategoryTree(TrainingType type)
+        {
+            long rootId = GetOrCreateCategory(MASTER_ROOT_ID, MASTER_ROOT_NAME, 0);
+
+            switch (type)
+            {
+                case TrainingType.DaiHoc_ChinhQuy:
+                    long dhId = GetOrCreateCategory(AppConstant.MoodleString.ctdtDHIdNumber, AppConstant.MoodleString.ctdtDHCategoryName, rootId);
+                    return GetOrCreateCategory(AppConstant.MoodleString.CQ_DH_IdNumber, AppConstant.MoodleString.CQ_DH_CategoryName, dhId);
+
+                case TrainingType.DaiHoc_VHVL:
+                    long dhId2 = GetOrCreateCategory(AppConstant.MoodleString.ctdtDHIdNumber, AppConstant.MoodleString.ctdtDHCategoryName, rootId);
+                    return GetOrCreateCategory(AppConstant.MoodleString.VHVL_DH_IdNumber, AppConstant.MoodleString.VHVL_DH_CategoryName, dhId2);
+
+                case TrainingType.SauDaiHoc:
+                    return GetOrCreateCategory(AppConstant.MoodleString.ctdtSDHIdNumber, AppConstant.MoodleString.ctdtSDHCategoryName, rootId);
+
+                default:
+                    return rootId;
+            }
+        }
+
+        // [SỬA] Thêm tham số maHe để tạo IDNumber chuẩn cho Khoa
+        private long EnsureFacultyCategory(long parentTypeId, MasterSyncViewModel item, string maHe)
+        {
+            if (string.IsNullOrEmpty(item.MaKhoa)) return parentTypeId;
+
+            string khoaIdNumber = string.Format("MASTER_{0}_KHOA_{1}", maHe, item.MaKhoa);
             string khoaName = string.IsNullOrEmpty(item.TenKhoa) ? item.MaKhoa : item.TenKhoa;
 
-            if (string.IsNullOrEmpty(item.MaKhoa)) return heCatId;
-            return GetOrCreateCategory(khoaId, khoaName, heCatId);
+            return GetOrCreateCategory(khoaIdNumber, khoaName, parentTypeId);
         }
 
         private long GetOrCreateCategory(string idNumber, string name, long parentId)
@@ -300,10 +337,19 @@ namespace ManageLMS.BLL.SyncEngine
             throw new Exception("Không thể tạo Category: " + name);
         }
 
-        private void CreateAndEnrollNewCourse(MasterSyncViewModel item, long categoryId)
+        // =================================================================
+        // 5. CRUD ACTIONS
+        // =================================================================
+
+        private void CreateAndEnrollNewCourse(MasterSyncViewModel item, long categoryId, TrainingType type)
         {
-            string idNumber = item.GetExpectedIdNumber();
-            string fullName = item.GetExpectedFullName();
+            // Lấy thông tin chuẩn từ Type
+            string maHe, tenHe;
+            GetHeInfoFromType(type, out maHe, out tenHe);
+
+            // Sinh ID và Tên dựa trên tham số chuẩn
+            string idNumber = item.GetExpectedIdNumber(maHe, item.MaKhoa);
+            string fullName = item.GetExpectedFullName(tenHe);
             string shortName = idNumber;
 
             var newCourse = new MoodleCourse
@@ -313,7 +359,7 @@ namespace ManageLMS.BLL.SyncEngine
                 idnumber = idNumber,
                 category = (int)categoryId,
                 visible = 1,
-                format = "topics"
+                format = "topics",
             };
 
             try
@@ -322,7 +368,7 @@ namespace ManageLMS.BLL.SyncEngine
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains("courseidnumbertaken") || ex.Message.Contains("shortnametaken") || ex.Message.Contains("already used"))
+                if (ex.Message.Contains("shortnametaken") || ex.Message.Contains("already used"))
                 {
                     Log(string.Format(" -> ⚠️ Khóa học {0} đã tồn tại. Chuyển sang cập nhật.", idNumber));
                     var existingCourses = _courseMgr.GetCoursesByField("idnumber", new List<string> { idNumber });
@@ -343,8 +389,6 @@ namespace ManageLMS.BLL.SyncEngine
             {
                 Log(string.Format(" -> Tạo mới: {0}", fullName));
                 long newId = createdList[0].id;
-
-                // [FIX] Truyền List Object
                 EnrollStudents(newId, item.ListData_SV_Thieu);
                 EnrollTeachers(newId, item.ListMaGiaoVien);
             }
@@ -353,17 +397,14 @@ namespace ManageLMS.BLL.SyncEngine
 
         private void FixDiffMasterCourse(MasterSyncViewModel item)
         {
-            // [FIX] Truyền List Object
             if (item.ListData_SV_Thieu != null && item.ListData_SV_Thieu.Count > 0)
                 EnrollStudents(item.MoodleCourseId, item.ListData_SV_Thieu);
 
             EnrollTeachers(item.MoodleCourseId, item.ListMaGiaoVien);
         }
 
-        // [FIX] Sửa tham số nhận List Object TTDsSVTheoLopHP
         private void EnrollStudents(long courseId, List<TTDsSVTheoLopHP> listStudentData)
         {
-            // Batching đã được chuyển vào trong StudentManager
             int count = _studentMgr.EnrollStudentsToCourse(courseId, listStudentData);
             if (count > 0) Log(string.Format(" -> Enroll & Create {0} sinh viên.", count));
         }
@@ -374,6 +415,47 @@ namespace ManageLMS.BLL.SyncEngine
             if (count > 0) Log(string.Format(" -> Gán {0} giảng viên.", count));
         }
 
+        // [QUAN TRỌNG] Hàm Map Enum -> String
+        private void GetHeInfoFromType(TrainingType type, out string maHe, out string tenHe)
+        {
+            switch (type)
+            {
+                case TrainingType.DaiHoc_ChinhQuy:
+                    maHe = "CQ";
+                    tenHe = "ĐH Chính Quy";
+                    break;
+                case TrainingType.DaiHoc_VHVL:
+                    maHe = "VHVL";
+                    tenHe = "ĐH Vừa Làm Vừa Học";
+                    break;
+                case TrainingType.SauDaiHoc:
+                    maHe = "SDH";
+                    tenHe = "Sau Đại Học";
+                    break;
+                default:
+                    maHe = "UNK";
+                    tenHe = "Khác";
+                    break;
+            }
+        }
+
+        // =================================================================
+        // 6. UTILS
+        // =================================================================
+        public List<MasterSyncViewModel> GetPageData(int page, int pageSize, SyncStatusFilter statusFilter)
+        {
+            if (_cachedMasterGroups == null || _cachedMasterGroups.Count == 0) return new List<MasterSyncViewModel>();
+            var pageGroups = _cachedMasterGroups.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            Log(string.Format("Đang xử lý trang {0}...", page));
+            return ProcessGroups(pageGroups);
+        }
+
+        public List<MasterSyncViewModel> GetAllMissingData()
+        {
+            if (_cachedMasterGroups == null || _cachedMasterGroups.Count == 0) return new List<MasterSyncViewModel>();
+            return ProcessGroups(_cachedMasterGroups).Where(x => x.MoodleCourseId == 0 || x.SoLuongThieu > 0).ToList();
+        }
+
         private List<List<T>> SplitList<T>(List<T> locations, int nSize = 30)
         {
             var list = new List<List<T>>();
@@ -381,7 +463,6 @@ namespace ManageLMS.BLL.SyncEngine
             return list;
         }
 
-        private bool CheckFilter(MasterSyncViewModel item, SyncStatusFilter filter) { return true; } // Logic filter UI đã chuyển sang client-side
         private void Log(string msg) { if (OnLogMessage != null) OnLogMessage(msg); }
         private void ReportProgress(int current, int total) { if (OnProgress != null) OnProgress(current, total); }
     }

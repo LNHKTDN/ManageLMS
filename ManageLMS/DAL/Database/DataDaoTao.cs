@@ -89,7 +89,7 @@ namespace ManageLMS.DAL.Database
         }
 
         // Master course
-        public List<TTDsSVTheoLopHP> GetDsSinhVienTheoLopHocPhan(int kyHoc, string maHocPhan,string maHe,string maKhoa ,int pageNumber, int pageSize)
+        public List<TTDsSVTheoLopHP> GetDsSinhVienTheoLopHocPhan(int kyHoc, string maHocPhan,string maKhoa ,int pageNumber, int pageSize)
         {
             var listResult = new List<TTDsSVTheoLopHP>();
 
@@ -106,13 +106,13 @@ namespace ManageLMS.DAL.Database
                     var paramMaHocPhan = new SqlParameter("@MA_HOC_PHAN", SqlDbType.NVarChar, 50);
                     paramMaHocPhan.Value = string.IsNullOrEmpty(maHocPhan) ? (object)DBNull.Value : maHocPhan;
 
-                    var paramMaHe = new SqlParameter("@MA_HE", SqlDbType.NVarChar, 50);
-                    paramMaHe.Value = string.IsNullOrEmpty(maHe) ? (object)DBNull.Value : maHe;
+                    //var paramMaHe = new SqlParameter("@MA_HE", SqlDbType.NVarChar, 50);
+                    //paramMaHe.Value = string.IsNullOrEmpty(maHe) ? (object)DBNull.Value : maHe;
 
                     var paramMaKhoa = new SqlParameter("@MA_KHOA", SqlDbType.NVarChar, 50);
                     paramMaKhoa.Value = string.IsNullOrEmpty(maKhoa) ? (object)DBNull.Value : maKhoa;
                     cmd.Parameters.Add(paramMaHocPhan);
-                    cmd.Parameters.Add(paramMaHe);
+                    //cmd.Parameters.Add(paramMaHe);
                     cmd.Parameters.Add(paramMaKhoa);
                     cmd.Parameters.Add("@PageNumber", SqlDbType.Int).Value = pageNumber;
                     cmd.Parameters.Add("@PageSize", SqlDbType.Int).Value = pageSize;

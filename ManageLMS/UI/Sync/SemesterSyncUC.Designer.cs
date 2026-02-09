@@ -50,10 +50,12 @@ namespace ManageLMS.UI.Sync
             this.lblPageNumber = new System.Windows.Forms.Label();
             this.btnPrevPage = new System.Windows.Forms.Button();
             this.dgvSemesterPreview = new System.Windows.Forms.DataGridView();
-            this.pbSyncProgress = new System.Windows.Forms.ProgressBar();
-            this.rtbLog = new System.Windows.Forms.RichTextBox();
             this.menuStripUserCourse = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.mnu_ViewEnrolledUser = new System.Windows.Forms.ToolStripMenuItem();
+            this.pbSyncProgress = new System.Windows.Forms.ProgressBar();
+            this.rtbLog = new System.Windows.Forms.RichTextBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.cbbHDT = new System.Windows.Forms.ComboBox();
             this.pnlSemesterTop.SuspendLayout();
             this.grpSemesterFilter.SuspendLayout();
             this.pnlSemesterActions.SuspendLayout();
@@ -74,7 +76,9 @@ namespace ManageLMS.UI.Sync
             // 
             this.grpSemesterFilter.Controls.Add(this.btnSyncSemStudents);
             this.grpSemesterFilter.Controls.Add(this.btnSemFilter);
+            this.grpSemesterFilter.Controls.Add(this.cbbHDT);
             this.grpSemesterFilter.Controls.Add(this.cboSemClass);
+            this.grpSemesterFilter.Controls.Add(this.label2);
             this.grpSemesterFilter.Controls.Add(this.lblSemClass);
             this.grpSemesterFilter.Controls.Add(this.txtSemYear);
             this.grpSemesterFilter.Controls.Add(this.lblSemYear);
@@ -93,9 +97,9 @@ namespace ManageLMS.UI.Sync
             // 
             this.btnSyncSemStudents.BackColor = System.Drawing.Color.LightBlue;
             this.btnSyncSemStudents.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.2F);
-            this.btnSyncSemStudents.Location = new System.Drawing.Point(694, 80);
+            this.btnSyncSemStudents.Location = new System.Drawing.Point(984, 68);
             this.btnSyncSemStudents.Name = "btnSyncSemStudents";
-            this.btnSyncSemStudents.Size = new System.Drawing.Size(273, 33);
+            this.btnSyncSemStudents.Size = new System.Drawing.Size(210, 33);
             this.btnSyncSemStudents.TabIndex = 2;
             this.btnSyncSemStudents.Text = "Đồng bộ trang hiện tại";
             this.btnSyncSemStudents.UseVisualStyleBackColor = false;
@@ -103,15 +107,15 @@ namespace ManageLMS.UI.Sync
             // btnSemFilter
             // 
             this.btnSemFilter.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.2F);
-            this.btnSemFilter.Location = new System.Drawing.Point(23, 84);
+            this.btnSemFilter.Location = new System.Drawing.Point(984, 30);
             this.btnSemFilter.Name = "btnSemFilter";
-            this.btnSemFilter.Size = new System.Drawing.Size(142, 30);
+            this.btnSemFilter.Size = new System.Drawing.Size(210, 30);
             this.btnSemFilter.TabIndex = 0;
             this.btnSemFilter.Text = "Lọc dữ liệu";
             // 
             // cboSemClass
             // 
-            this.cboSemClass.Location = new System.Drawing.Point(235, 27);
+            this.cboSemClass.Location = new System.Drawing.Point(411, 35);
             this.cboSemClass.Name = "cboSemClass";
             this.cboSemClass.Size = new System.Drawing.Size(150, 24);
             this.cboSemClass.TabIndex = 1;
@@ -119,7 +123,7 @@ namespace ManageLMS.UI.Sync
             // lblSemClass
             // 
             this.lblSemClass.AutoSize = true;
-            this.lblSemClass.Location = new System.Drawing.Point(195, 30);
+            this.lblSemClass.Location = new System.Drawing.Point(371, 38);
             this.lblSemClass.Name = "lblSemClass";
             this.lblSemClass.Size = new System.Drawing.Size(36, 17);
             this.lblSemClass.TabIndex = 2;
@@ -127,7 +131,7 @@ namespace ManageLMS.UI.Sync
             // 
             // txtSemYear
             // 
-            this.txtSemYear.Location = new System.Drawing.Point(80, 27);
+            this.txtSemYear.Location = new System.Drawing.Point(256, 35);
             this.txtSemYear.Name = "txtSemYear";
             this.txtSemYear.Size = new System.Drawing.Size(100, 22);
             this.txtSemYear.TabIndex = 5;
@@ -135,7 +139,7 @@ namespace ManageLMS.UI.Sync
             // lblSemYear
             // 
             this.lblSemYear.AutoSize = true;
-            this.lblSemYear.Location = new System.Drawing.Point(6, 30);
+            this.lblSemYear.Location = new System.Drawing.Point(182, 38);
             this.lblSemYear.Name = "lblSemYear";
             this.lblSemYear.Size = new System.Drawing.Size(68, 17);
             this.lblSemYear.TabIndex = 6;
@@ -145,7 +149,7 @@ namespace ManageLMS.UI.Sync
             // 
             this.cboStatusFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboStatusFilter.FormattingEnabled = true;
-            this.cboStatusFilter.Location = new System.Drawing.Point(500, 27);
+            this.cboStatusFilter.Location = new System.Drawing.Point(676, 35);
             this.cboStatusFilter.Name = "cboStatusFilter";
             this.cboStatusFilter.Size = new System.Drawing.Size(150, 24);
             this.cboStatusFilter.TabIndex = 7;
@@ -153,7 +157,7 @@ namespace ManageLMS.UI.Sync
             // lblStatus
             // 
             this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(417, 30);
+            this.lblStatus.Location = new System.Drawing.Point(593, 38);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(77, 17);
             this.lblStatus.TabIndex = 8;
@@ -162,11 +166,11 @@ namespace ManageLMS.UI.Sync
             // btnSyncAll
             // 
             this.btnSyncAll.BackColor = System.Drawing.Color.Orange;
-            this.btnSyncAll.Location = new System.Drawing.Point(694, 30);
+            this.btnSyncAll.Location = new System.Drawing.Point(842, 30);
             this.btnSyncAll.Name = "btnSyncAll";
-            this.btnSyncAll.Size = new System.Drawing.Size(273, 33);
+            this.btnSyncAll.Size = new System.Drawing.Size(125, 33);
             this.btnSyncAll.TabIndex = 9;
-            this.btnSyncAll.Text = "Đồng bộ tất cả";
+            this.btnSyncAll.Text = "Đồng bộ dữ liệu";
             this.btnSyncAll.UseVisualStyleBackColor = false;
             this.btnSyncAll.Click += new System.EventHandler(this.btnSyncAll_Click);
             // 
@@ -223,6 +227,21 @@ namespace ManageLMS.UI.Sync
             this.dgvSemesterPreview.Size = new System.Drawing.Size(1200, 636);
             this.dgvSemesterPreview.TabIndex = 0;
             // 
+            // menuStripUserCourse
+            // 
+            this.menuStripUserCourse.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.menuStripUserCourse.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.mnu_ViewEnrolledUser});
+            this.menuStripUserCourse.Name = "menuStripUserCourse";
+            this.menuStripUserCourse.Size = new System.Drawing.Size(181, 28);
+            // 
+            // mnu_ViewEnrolledUser
+            // 
+            this.mnu_ViewEnrolledUser.Name = "mnu_ViewEnrolledUser";
+            this.mnu_ViewEnrolledUser.Size = new System.Drawing.Size(180, 24);
+            this.mnu_ViewEnrolledUser.Text = "Xem thành viên";
+            this.mnu_ViewEnrolledUser.Click += new System.EventHandler(this.mnu_ViewEnrolledUser_Click);
+            // 
             // pbSyncProgress
             // 
             this.pbSyncProgress.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -244,20 +263,21 @@ namespace ManageLMS.UI.Sync
             this.rtbLog.TabIndex = 1;
             this.rtbLog.Text = "";
             // 
-            // menuStripUserCourse
+            // label2
             // 
-            this.menuStripUserCourse.ImageScalingSize = new System.Drawing.Size(20, 20);
-            this.menuStripUserCourse.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.mnu_ViewEnrolledUser});
-            this.menuStripUserCourse.Name = "menuStripUserCourse";
-            this.menuStripUserCourse.Size = new System.Drawing.Size(181, 56);
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(6, 35);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(30, 17);
+            this.label2.TabIndex = 2;
+            this.label2.Text = "Hệ:";
             // 
-            // mnu_ViewEnrolledUser
+            // cbbHDT
             // 
-            this.mnu_ViewEnrolledUser.Name = "mnu_ViewEnrolledUser";
-            this.mnu_ViewEnrolledUser.Size = new System.Drawing.Size(180, 24);
-            this.mnu_ViewEnrolledUser.Text = "Xem thành viên";
-            this.mnu_ViewEnrolledUser.Click += new System.EventHandler(this.mnu_ViewEnrolledUser_Click);
+            this.cbbHDT.Location = new System.Drawing.Point(46, 32);
+            this.cbbHDT.Name = "cbbHDT";
+            this.cbbHDT.Size = new System.Drawing.Size(130, 24);
+            this.cbbHDT.TabIndex = 1;
             // 
             // SemesterSyncUC
             // 
@@ -304,5 +324,7 @@ namespace ManageLMS.UI.Sync
         private RichTextBox rtbLog;
         private ContextMenuStrip menuStripUserCourse;
         private ToolStripMenuItem mnu_ViewEnrolledUser;
+        private ComboBox cbbHDT;
+        private Label label2;
     }
 }

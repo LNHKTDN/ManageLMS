@@ -177,6 +177,7 @@ namespace ManageLMS.DAL.MoodleAPI.Repositories
                 {
                     postData.Add(string.Format("courses[{0}][idnumber]", i), courses[i].idnumber);
                 }
+                postData.Add(string.Format("courses[{0}][enddate]", i), "0");
 
             }
 
@@ -192,7 +193,7 @@ namespace ManageLMS.DAL.MoodleAPI.Repositories
             param.Add("value", value);
 
             string jsonResponse = _client.Post(funcName, param);
-            // CheckMoodleError(jsonResponse); // Có thể bỏ qua check lỗi để không gián đoạn batch
+            
 
             try
             {

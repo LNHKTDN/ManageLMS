@@ -68,6 +68,27 @@ namespace ManageLMS.Common.Helpers
         {
             public const string masterIdNumber = "MASTER_ROOT";
             public const string masterCategoryName = "Master Courses";
+
+            public const string semesterIdNumber = "SEMESTER_ROOT";
+            public const string semesterCategoryName = "Các học kì";
+
+            public const string CQsemesterIdNumber = "CQ_SEMESTER_ROOT";
+            public const string CQsemesterCategoryName = "Hệ Chính quy";
+
+            public const string VHVLsemesterIdNumber = "VHVL_SEMESTER_ROOT";
+            public const string VHVLsemesterCategoryName = "Hệ Vừa học vừa làm";
+
+            public const string ctdtDHIdNumber = "DH_MASTER_ROOT";
+            public const string ctdtDHCategoryName = "CTĐT Đại học";
+
+            public const string VHVL_DH_IdNumber = "VHVL_DH_MASTER_ROOT";
+            public const string VHVL_DH_CategoryName = "Hệ Vừa học vừa làm";
+
+            public const string CQ_DH_IdNumber = "CQ_DH_MASTER_ROOT";
+            public const string CQ_DH_CategoryName = "Hệ Chính Quy";
+
+            public const string ctdtSDHIdNumber = "SDH_MASTER_ROOT";
+            public const string ctdtSDHCategoryName = "CTĐT Sau đại học";
         }
     }
 }
